@@ -13,7 +13,7 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────────────────────────
-  # Job 1: Run tests against a real MySQL container
+  # Job 1: Run pytest against a real MySQL container
   # ─────────────────────────────────────────────────────────────────
   test:
     name: Run pytest (DB + API)
@@ -66,6 +66,28 @@ jobs:
           file: backend/coverage.xml
         continue-on-error: true
 
+      # שליחת מייל על כשלון בבדיקות
+      - name: Send failure email
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ CI FAILED — SmartRecipe AI tests failed on commit ${{ github.sha }}"
+          to: ${{ secrets.MAIL_RECIPIENT }}
+          from: SmartRecipe CI <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Pipeline failed at: Test stage
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Triggered by: ${{ github.actor }}
+
+            View the failed run:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
   # ─────────────────────────────────────────────────────────────────
   # Job 2: Build and push Docker images to Docker Hub
   # ─────────────────────────────────────────────────────────────────
@@ -88,17 +110,6 @@ jobs:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
           password: ${{ secrets.DOCKER_HUB_TOKEN }}
 
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: |
-            ${{ env.IMAGE_BACKEND }}
-            ${{ env.IMAGE_FRONTEND }}
-          tags: |
-            type=sha,prefix=sha-
-            type=raw,value=latest,enable={{is_default_branch}}
-
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
@@ -116,6 +127,26 @@ jobs:
           tags: ${{ env.IMAGE_FRONTEND }}:latest,${{ env.IMAGE_FRONTEND }}:sha-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Send failure email
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ CI FAILED — Docker build/push failed on commit ${{ github.sha }}"
+          to: ${{ secrets.MAIL_RECIPIENT }}
+          from: SmartRecipe CI <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Pipeline failed at: Build & Push stage
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+
+            View the failed run:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
   # ─────────────────────────────────────────────────────────────────
   # Job 3: Deploy to Hetzner server via SSH
@@ -147,12 +178,46 @@ jobs:
           username: ${{ secrets.HETZNER_USER }}
           key: ${{ secrets.HETZNER_SSH_KEY }}
           port: 22
-          envs: DOCKER_HUB_USERNAME,IMAGE_TAG
           script: |
             export IMAGE_TAG=sha-${{ github.sha }}
             export DOCKER_HUB_USERNAME=${{ secrets.DOCKER_HUB_USERNAME }}
             bash /opt/smartrecipe/infrastructure/deploy.sh
 
-      - name: Notify deployment success
+      - name: Send failure email
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "❌ CD FAILED — Deployment to Hetzner failed on commit ${{ github.sha }}"
+          to: ${{ secrets.MAIL_RECIPIENT }}
+          from: SmartRecipe CI <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Pipeline failed at: Deploy stage
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Server: ${{ secrets.HETZNER_HOST }}
+
+            View the failed run:
+            https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+      - name: Send success email
         if: success()
-        run: echo "Deployment to Hetzner completed successfully for commit ${{ github.sha }}"
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: smtp.gmail.com
+          server_port: 465
+          username: ${{ secrets.MAIL_USERNAME }}
+          password: ${{ secrets.MAIL_PASSWORD }}
+          subject: "✅ Deploy SUCCESS — SmartRecipe AI deployed: ${{ github.sha }}"
+          to: ${{ secrets.MAIL_RECIPIENT }}
+          from: SmartRecipe CI <${{ secrets.MAIL_USERNAME }}>
+          body: |
+            Deployment completed successfully!
+            Repository: ${{ github.repository }}
+            Commit: ${{ github.sha }}
+            Triggered by: ${{ github.actor }}
+            Server: ${{ secrets.HETZNER_HOST }}
