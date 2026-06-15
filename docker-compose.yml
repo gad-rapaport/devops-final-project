@@ -1,0 +1,95 @@
+version: "3.9"
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: smartrecipe-db
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: smartrecipe
+      MYSQL_USER: smartrecipe
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-smartrecipe}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./infrastructure/mysql-init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "smartrecipe", "--password=${MYSQL_PASSWORD:-smartrecipe}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - smartrecipe-net
+
+  backend:
+    build: ./backend
+    container_name: smartrecipe-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+pymysql://smartrecipe:${MYSQL_PASSWORD:-smartrecipe}@db:3306/smartrecipe
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      SECRET_KEY: ${SECRET_KEY:-change-me-in-production}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - smartrecipe-net
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  frontend:
+    build: ./frontend
+    container_name: smartrecipe-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - smartrecipe-net
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: smartrecipe-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - smartrecipe-net
+
+  grafana:
+    image: grafana/grafana:11.1.0
+    container_name: smartrecipe-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GF_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - smartrecipe-net
+
+volumes:
+  db_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  smartrecipe-net:
+    driver: bridge

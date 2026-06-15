@@ -1,0 +1,25 @@
+version: "3.9"
+
+# Production overrides — use with:
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+  backend:
+    image: ${DOCKER_HUB_USERNAME}/smartrecipe-backend:${IMAGE_TAG:-latest}
+    build: ~
+
+  frontend:
+    image: ${DOCKER_HUB_USERNAME}/smartrecipe-frontend:${IMAGE_TAG:-latest}
+    build: ~
+
+  db:
+    volumes:
+      - /opt/smartrecipe/mysql_data:/var/lib/mysql
+
+  prometheus:
+    volumes:
+      - /opt/smartrecipe/prometheus_data:/prometheus
+
+  grafana:
+    volumes:
+      - /opt/smartrecipe/grafana_data:/var/lib/grafana

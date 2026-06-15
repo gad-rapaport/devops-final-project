@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: SmartRecipe
+    orgId: 1
+    folder: SmartRecipe AI
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
