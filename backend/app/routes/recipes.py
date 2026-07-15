@@ -92,7 +92,7 @@ def delete_recipe(recipe_id):
     recipe = Recipe.query.get_or_404(recipe_id)
     db.session.delete(recipe)
     db.session.commit()
-    return jsonify({"message": "Recipe deleted"}), 204
+    return jsonify({"message": "Recipe deleted"}), 200
 
 
 @bp.route("/recipes/<int:recipe_id>/variations", methods=["GET"])
