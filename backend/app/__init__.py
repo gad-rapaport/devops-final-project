@@ -34,4 +34,11 @@ def create_app(config=None):
     app.register_blueprint(recipes_bp, url_prefix="/api")
     app.register_blueprint(health_bp)
 
+    # Auto-create tables on startup so `docker compose up` works with no
+    # manual migration step. Skipped under TESTING (conftest manages its
+    # own schema via create_all/drop_all).
+    if not app.config.get("TESTING"):
+        with app.app_context():
+            db.create_all()
+
     return app
