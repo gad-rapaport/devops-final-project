@@ -30,7 +30,7 @@ Respond ONLY with a valid JSON object (no markdown, no extra text) in this exact
   "prep_time_minutes": 30
 }}"""
 
-    response = model.generate_content(prompt)
+    response = model.generate_content(prompt, request_options={"timeout": 15})
     text = response.text.strip()
 
     if text.startswith("```"):
@@ -48,5 +48,5 @@ def suggest_variations(recipe_title: str, original_ingredients: str) -> str:
 Suggest 3 creative variations or substitutions to make this recipe healthier, more budget-friendly, or suitable for different dietary needs.
 Be concise — 2-3 sentences per variation."""
 
-    response = model.generate_content(prompt)
+    response = model.generate_content(prompt, request_options={"timeout": 15})
     return response.text.strip()
