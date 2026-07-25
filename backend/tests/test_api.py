@@ -91,9 +91,14 @@ def test_save_recipe_missing_field(client):
     assert resp.status_code == 400
 
 
-def test_generate_recipe_no_key(client):
+def test_generate_recipe_no_key(client, monkeypatch):
+    def fake_generate_recipe(ingredients, preferences=""):
+        raise ValueError("GEMINI_API_KEY environment variable is not set")
+
+    monkeypatch.setattr("app.routes.recipes.generate_recipe", fake_generate_recipe)
+
     resp = client.post("/api/recipes/generate", json={"ingredients": ["chicken"]})
-    assert resp.status_code in (200, 500)
+    assert resp.status_code == 500
 
 
 def test_generate_recipe_missing_ingredients(client):
